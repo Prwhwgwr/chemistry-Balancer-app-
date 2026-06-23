@@ -1,211 +1,200 @@
 import streamlit as st
-import pandas as pd
+import streamlit.components.v1 as components
+import extra_streamlit_components as stx
+import datetime
+import time
+import os
+import gspread
 from chempy import balance_stoichiometry
 
 # --- Page Configuration ---
 st.set_page_config(page_title="🧪 Chemical Equation Balancer", page_icon="🧪", layout="centered")
 
-# --- Hide Streamlit Branding ---
+# --- Hide Branding (Deploy Button, Footer, Fork, Badge) ---
+# NOTE: Removed 'header {visibility: hidden;}' so the sidebar arrow comes back!
 hide_st_style = """
             <style>
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
-            header {visibility: hidden;}
             .stDeployButton {display:none;}
+            [data-testid="stToolbar"] {visibility: hidden !important;}
+            [data-testid="stViewerBadge"] {display: none !important;}
             </style>
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
 
-# --- 🛠️ DIRECT GOOGLE SHEET CONNECTOR (Python 3.14 Fix) 🛠️ ---
-def read_google_sheet_direct():
-    """Reads your public Google Sheet link via pandas to check voucher codes"""
-    try:
-        sheet_url = st.secrets["connections"]["gsheets"]["spreadsheet"]
-        if "/edit" in sheet_url:
-            base_url = sheet_url.split("/edit")[0]
-            csv_url = f"{base_url}/export?format=csv"
-        else:
-            csv_url = sheet_url
-        df = pd.read_csv(csv_url)
-        return df
-    except Exception:
-        st.error("⚠️ Database Sync Failed. Ensure secrets.toml has your spreadsheet link and it is set to public viewer access.")
-        return None
+# --- 1. Initialize Cookie Manager ---
+cookie_manager = stx.CookieManager(key="cookie_manager")
 
-# --- Initialize Core Session States ---
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "username" not in st.session_state:
-    st.session_state.username = ""
+# --- Initialize Session States ---
 if "is_premium" not in st.session_state:
     st.session_state.is_premium = False
 if "daily_balances" not in st.session_state:
     st.session_state.daily_balances = 0
 if "history" not in st.session_state:
     st.session_state.history = []
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "username" not in st.session_state:
+    st.session_state.username = ""
 
-# --- App Header ---
+# --- 2. Check for existing cookies EVERY run ---
+# If a cookie exists in the browser, force the user to be logged in!
+saved_user = cookie_manager.get(cookie="saved_username")
+
+if saved_user is not None and saved_user != "":
+    st.session_state.logged_in = True
+    st.session_state.username = saved_user
+
 st.title("🧪 Chemical Equation Balancer")
 
-# ==========================================
-# PHASE 1: LOGIN PORTAL
-# ==========================================
+# --- PHASE 1: LOGIN PORTAL ---
 if not st.session_state.logged_in:
     st.write("### 🔑 Account Portal")
-    st.write("Welcome! Please log in with a username or email to start tracking your daily limits.")
-    
-    user_input_name = st.text_input("Enter Username or Email ID:", placeholder="e.g., student123")
-    
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        if st.button("🚀 Enter Balancer App", type="primary", use_container_width=True):
+    with st.form(key="login_form"):
+        user_input_name = st.text_input("Enter Username:")
+        keep_signed_in = st.checkbox("Keep me signed in")
+        submit_button = st.form_submit_button("🚀 Enter Balancer App")
+        
+        if submit_button:
             if user_input_name.strip():
                 st.session_state.username = user_input_name.strip()
                 st.session_state.logged_in = True
-                st.rerun()
+                
+                # Save to Cookie if Checkbox is ticked
+                if keep_signed_in:
+                    expire_date = datetime.datetime.now() + datetime.timedelta(days=30)
+                    cookie_manager.set("saved_username", user_input_name.strip(), expires_at=expire_date)
+                    
+                st.success("🚀 Login successful! Redirecting...")
+                
+                # CRITICAL FIX: Use Javascript to refresh the browser after 1.5 seconds.
+                # This guarantees the browser has time to finish saving the cookie file!
+                components.html(
+                    """
+                    <script>
+                    setTimeout(function() {
+                        window.parent.location.reload();
+                    }, 1500);
+                    </script>
+                    """,
+                    height=0
+                )
+                st.stop() # Stops Python here so it doesn't interrupt the Javascript
             else:
-                st.error("Please enter a username or email to continue!")
+                st.error("Please enter a username!")
 
-# ==========================================
-# PHASE 2: MAIN APPLICATION
-# ==========================================
-else:
-    # --- SIDEBAR SYSTEM ---
-    st.sidebar.markdown("### 👤 User Account Profile")
-    st.sidebar.write(f"Logged in as: **{st.session_state.username}**")
+# --- PHASE 2: APP INTERFACE ---
+if st.session_state.logged_in:
+    st.sidebar.markdown(f"### 👤 {st.session_state.username}")
     
-    if st.session_state.is_premium:
-        st.sidebar.markdown("👑 **Tier:** `PREMIUM ACCOUNT`")
-        st.sidebar.caption("⏳ Unlimited usage active.")
-    else:
-        st.sidebar.markdown("💡 **Tier:** `FREE ACCOUNT`")
-        st.sidebar.write(f"Daily Usage: **{st.session_state.daily_balances} / 5** equations used")
-
-    if st.sidebar.button("🚪 Log Out", use_container_width=True):
-        st.session_state.logged_in = False
-        st.session_state.is_premium = False
-        st.session_state.daily_balances = 0
+    # --- LOGOUT BUTTON FIX ---
+    if st.sidebar.button("🚪 Log Out"):
+        cookie_manager.delete("saved_username") # Destroy the cookie
+        st.session_state.logged_in = False      # Reset session memory
         st.session_state.username = ""
-        st.rerun()
         
-    # --- TABS SYSTEM ---
-    tab1, tab2 = st.tabs(["🎛️ Balancer Engine", "📜 History Log"])
+        st.sidebar.success("Logging out...")
+        # CRITICAL FIX: Javascript reload to ensure cookie is deleted cleanly
+        components.html(
+            """
+            <script>
+            setTimeout(function() {
+                window.parent.location.reload();
+            }, 1500);
+            </script>
+            """,
+            height=0
+        )
+        st.stop()
+        
+    tab1, tab2, tab3 = st.tabs(["🎛️ Balancer", "📜 History", "ℹ️ Help & Premium"])
 
     with tab1:
-        # Premium Image Feature block
-        if st.session_state.is_premium:
-            st.markdown("### 📸 Premium Feature: Upload Equation Screenshot")
-            uploaded_file = st.file_uploader("Upload an image of a chemical problem to scan:", type=["png", "jpg", "jpeg"])
-            st.markdown("---")
-        else:
-            st.markdown("### 📸 Upload Equation Screenshot")
-            st.warning("🔒 **Premium Feature Locked:** Free accounts cannot upload screenshots.")
-            st.button("🚫 Upload Image (Premium Only)", disabled=True)
-            st.markdown("---")
-
-        st.write("Type your unbalanced chemical equation below:")
-        user_input = st.text_input("Enter Reaction (Use '+' and '->'):", value="KMnO4 + HCl -> KCl + MnCl2 + H2O + Cl2")
-
-        # Paywall is only triggered if a free account hits 5 daily uses
-        paywall_blocked = False
-        if not st.session_state.is_premium and st.session_state.daily_balances >= 5:
-            paywall_blocked = True
-            st.error("🛑 **Daily Limit Reached!** Free tier users are limited to 5 equations per day.")
-
-        # ==========================================
-        # ONE-TIME USE GAMING REDEEM PAYWALL WITH SOCIAL LINKS
-        # ==========================================
-        if paywall_blocked:
-            st.markdown("""
-                <div style="background-color:#1E1E24; padding:22px; border-radius:12px; border: 2px solid #00FF66; text-align:center; margin-top:15px; margin-bottom: 15px;">
-                    <h2 style="color:#00FF66; margin-top:0;">👑 Unlock Unlimited Access</h2>
-                    <p style="font-size:15px;">Daily free limit exhausted! To unlock unlimited balances and premium photo scanning, you need a voucher pin.</p>
-                </div>
-            """, unsafe_allow_html=True)
+        if not st.session_state.is_premium:
+            st.write(f"Daily Usage: {st.session_state.daily_balances} / 5")
             
-            st.markdown("### 🎟️ Don't have a code? Grab one here:")
-            
-            # Create two columns for your social link buttons
-            btn_col1, btn_col2 = st.columns(2)
-            
-            with btn_col1:
-                # 📢 REMINDER: Change '919876543210' to your real mobile number with country code!
-                whatsapp_url = "https://wa.me/919876543210?text=Bro%20give%20me%20the%20premium%20balancer%20code"
-                st.link_button("💬 Message on WhatsApp", whatsapp_url, use_container_width=True, type="secondary")
-                st.caption("Text me directly to buy/request a personal code!")
-                
-            with btn_col2:
-                # 📢 REMINDER: Change 'your_username' to your actual Insta handle!
-                instagram_url = "https://instagram.com/your_username"
-                st.link_button("📸 Follow on Instagram", instagram_url, use_container_width=True, type="secondary")
-                st.caption("Check my stories/posts for daily code drops!")
+        user_input = st.text_input("Enter Equation (Reactants -> Products):", value="KMnO4 + HCl -> KCl + MnCl2 + H2O + Cl2")
 
-            st.markdown("---")
-            
-            # The actual Code Input Box
-            game_card_input = st.text_input("Enter 12-Digit One-Time Redeem Code:", placeholder="e.g., REDOX-7391-A").strip()
-            
-            if st.button("Redeem Premium Voucher Card", type="primary", use_container_width=True):
-                if not game_card_input:
-                    st.error("Please enter a code pin voucher first!")
-                else:
-                    df = read_google_sheet_direct()
-                    if df is not None:
-                        df.columns = [c.strip() for c in df.columns]
-                        match = df[df['Code'].astype(str).str.strip() == game_card_input]
-                        
-                        if match.empty:
-                            st.error("❌ Invalid Code Pin! This voucher code does not exist.")
-                        else:
-                            current_status = str(match.iloc[0]['Status']).strip().lower()
-                            if current_status == "used":
-                                st.error("⚠️ This code has already been redeemed!")
-                            elif current_status == "unused":
-                                st.session_state.is_premium = True
-                                st.success("🎉 REDEEM SUCCESSFUL! Permanent Premium tier features activated.")
-                                st.rerun()
-            
-        else:
-            if st.button("Balance Equation", type="primary"):
-                raw_input = user_input.strip()
-                if not raw_input:
-                    st.error("Please write an equation first!")
-                else:
-                    try:
-                        reactants_side, products_side = raw_input.split("->")
-                        reactants = set(formula.strip() for formula in reactants_side.split("+") if formula.strip())
-                        products = set(formula.strip() for formula in products_side.split("+") if formula.strip())
-                        
-                        reac_coefficients, prod_coefficients = balance_stoichiometry(reactants, products)
-                        reac_parts = [f"**{reac_coefficients[r]}** {r}" if reac_coefficients[r] > 1 else r for r in reactants]
-                        prod_parts = [f"**{prod_coefficients[p]}** {p}" if prod_coefficients[p] > 1 else p for p in products]
-                        balanced_result = " + ".join(reac_parts) + " &nbsp;&rarr;&nbsp; " + " + ".join(prod_parts)
-                        
-                        # Save historical items
-                        history_entry = " + ".join([f"{reac_coefficients[r]} {r}" for r in reactants]) + "  →  " + " + ".join([f"{prod_coefficients[p]} {p}" for p in products])
-                        st.session_state.history.insert(0, history_entry)
-
-                        if not st.session_state.is_premium:
-                            st.session_state.daily_balances += 1
-
-                        st.success("### Balanced Successfully!")
-                        st.markdown(f"<h3 style='color: #00FF66;'>{balanced_result}</h3>", unsafe_allow_html=True)
-                    except Exception:
-                        st.error("Could not balance equation. Check your formatting syntax.")
+        if st.button("Balance Equation"):
+            # Premium Check
+            if not st.session_state.is_premium and st.session_state.daily_balances >= 5:
+                st.error("🛑 Daily Limit Reached! Upgrade in the 'Help & Premium' tab.")
+            else:
+                try:
+                    reac_side, prod_side = user_input.split("->")
+                    reactants = set(f.strip() for f in reac_side.split("+") if f.strip())
+                    products = set(f.strip() for f in prod_side.split("+") if f.strip())
+                    reac_c, prod_c = balance_stoichiometry(reactants, products)
+                    res = " + ".join([f"{reac_c[r]} {r}" for r in reactants]) + " → " + " + ".join([f"{prod_c[p]} {p}" for p in products])
+                    
+                    st.session_state.history.insert(0, res)
+                    if not st.session_state.is_premium:
+                        st.session_state.daily_balances += 1
+                    st.success(f"Balanced: {res}")
+                except Exception as e:
+                    st.error("Format Error! Use '+' between compounds and '->' in the middle.")
 
     with tab2:
-        st.header("Previous Balances Log")
-        if st.button("Clear History Log"):
-            st.session_state.history = []
-            st.rerun()
-            
-        if not st.session_state.history:
-            st.info("No queries solved yet inside this active session.")
-        else:
-            for item in st.session_state.history:
-                st.code(item, language="text")
-# Create a clickable WhatsApp button with your number
-whatsapp_number = "919123651311" # Added country code 91 for India
-whatsapp_url = f"https://wa.me/{whatsapp_number}?text=Hi!%20I%20would%20like%20to%20get%20a%20premium%20balancer%20code."
+        for item in st.session_state.history:
+            st.code(item)
 
-st.link_button("💬 Contact Me on WhatsApp for premium access", whatsapp_url, use_container_width=True)
+    with tab3:
+        st.markdown("### 📖 How to Use")
+        st.write("1. **Enter Equation:** Use '+' for chemicals and '->' to separate reactants/products.")
+        st.write("2. **Example:** `H2 + O2 -> H2O`")
+        st.write("3. **Free Tier:** Limited to 5 balances per day.")
+        
+        st.markdown("---")
+        st.markdown("### 👑 Unlock Premium (Unlimited)")
+        st.write("Message me on WhatsApp to buy a redeem code.")
+        st.link_button("💬 Contact Me on WhatsApp", "https://wa.me/919123651311?text=Hi!%20I%20want%20to%20buy%20a%20premium%20balancer%20code.")
+        
+        code = st.text_input("Enter 8-Digit Redeem Code:")
+        
+        # --- NEW DATABASE REDEMPTION LOGIC ---
+        if st.button("Redeem Code"):
+            if code.strip() == "":
+                st.error("Please enter a code first!")
+            else:
+                with st.spinner("Checking database..."):
+                    try:
+                        # Connect to Google Cloud
+                        if os.path.exists('secrets.json'):
+                            gc = gspread.service_account(filename='secrets.json')
+                        else:
+                            credentials = dict(st.secrets["gcp_service_account"])
+                            gc = gspread.service_account_from_dict(credentials)
+                            
+                        sh = gc.open("App Gift cards")
+                        worksheet = sh.sheet1
+                        
+                        search_code = code.strip()
+                        cell = worksheet.find(search_code)
+                        
+                        if cell:
+                            # Check if it is used or unused
+                            status = worksheet.cell(cell.row, 2).value
+                            
+                            if status.lower() == "unused":
+                                # Mark as used in Column B
+                                worksheet.update_cell(cell.row, 2, 'used')
+                                # Save the actual username in Column C
+                                worksheet.update_cell(cell.row, 3, st.session_state.username)
+                                
+                                st.session_state.is_premium = True
+                                st.success("🎉 Premium Activated! Enjoy unlimited balancing.")
+                                time.sleep(2) 
+                                st.rerun() 
+                            else:
+                                st.error("❌ This code has already been used!")
+                        else:
+                            st.error("❌ Invalid Code. Please check for typos.")
+                    
+                    except Exception as e:
+                        st.error("Database error. Make sure your secrets.json is in the folder!")
+                        print(e)
+
+# --- FOOTER ---
+st.markdown("---")
+st.markdown("<center>CREATED BY ♥ PRANEEL BANERJEE</center>", unsafe_allow_html=True)
