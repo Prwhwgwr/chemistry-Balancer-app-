@@ -8,17 +8,20 @@ import gspread
 from chempy import balance_stoichiometry
 
 # --- Page Configuration ---
-# ADDED: initial_sidebar_state="expanded" so it automatically pops open when you log in!
 st.set_page_config(page_title="🧪 Chemical Equation Balancer", page_icon="🧪", layout="centered", initial_sidebar_state="expanded")
 
-# --- Hide Branding (Deploy Button, Footer, Fork, Badge) ---
-# TARGETED FIX: We are no longer hiding the whole toolbar. We are ONLY hiding the specific ugly buttons.
+# --- Hide Branding & DESTROY Sidebar Arrow ---
 hide_st_style = """
             <style>
+            /* Hide the ugly top-right buttons */
             .stDeployButton {display: none !important;}
             #MainMenu {visibility: hidden;}
             [data-testid="stViewerBadge"] {display: none !important;}
             footer {visibility: hidden;}
+            
+            /* Destroy the Open/Close Sidebar Buttons completely */
+            [data-testid="collapsedControl"] {display: none !important;}
+            [data-testid="stSidebarCollapseButton"] {display: none !important;}
             </style>
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
