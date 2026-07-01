@@ -8,25 +8,22 @@ import gspread
 from chempy import balance_stoichiometry
 
 # --- Page Configuration ---
-# FIX: Switched back to 'auto' to prevent the closing glitch on web browsers
-st.set_page_config(page_title="🧪 Chemical Equation Balancer", page_icon="🧪", layout="centered", initial_sidebar_state="auto")
+# Sidebar is gone, so we set state to 'collapsed'
+st.set_page_config(page_title="🧪 Chemical Equation Balancer", page_icon="🧪", layout="centered", initial_sidebar_state="collapsed")
 
-# --- THE SAFEST CSS FIX ---
+# --- Hide Branding (No Sidebar needed) ---
 hide_st_style = """
             <style>
-            /* Safely hide the 'Deploy' Button and Main Menu without breaking the header */
             .stAppDeployButton {display:none !important;}
             .stDeployButton {display:none !important;}
             #MainMenu {display: none !important;}
             [data-testid="stViewerBadge"] {display: none !important;}
             footer {visibility: hidden !important;}
+            /* Force hide the sidebar if it tries to exist */
+            [data-testid="stSidebar"] {display: none !important;}
             </style>
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
-
-# --- THE ULTIMATE ARROW FIX ---
-# This invisible container forces Streamlit to NEVER delete the sidebar arrow!
-st.sidebar.container()
 
 # --- 1. Initialize Cookie Manager ---
 cookie_manager = stx.CookieManager(key="cookie_manager")
@@ -44,7 +41,6 @@ if "username" not in st.session_state:
     st.session_state.username = ""
 
 # --- 2. Check for existing cookies EVERY run ---
-# If a cookie exists in the browser, force the user to be logged in!
 saved_user = cookie_manager.get(cookie="saved_username")
 
 if saved_user is not None and saved_user != "":
@@ -52,11 +48,6 @@ if saved_user is not None and saved_user != "":
     st.session_state.username = saved_user
 
 st.title("🧪 Chemical Equation Balancer")
-
-# --- FORCE THE SIDEBAR MENU ---
-st.sidebar.markdown("### 🧭 App Menu")
-if not st.session_state.logged_in:
-    st.sidebar.info("Please log in to use the balancer.")
 
 # --- PHASE 1: LOGIN PORTAL ---
 if not st.session_state.logged_in:
@@ -71,52 +62,20 @@ if not st.session_state.logged_in:
                 st.session_state.username = user_input_name.strip()
                 st.session_state.logged_in = True
                 
-                # Save to Cookie if Checkbox is ticked
                 if keep_signed_in:
                     expire_date = datetime.datetime.now() + datetime.timedelta(days=30)
                     cookie_manager.set("saved_username", user_input_name.strip(), expires_at=expire_date)
                     
                 st.success("🚀 Login successful! Redirecting...")
-                
-                # CRITICAL FIX: Use Javascript to refresh the browser after 1.5 seconds.
-                components.html(
-                    """
-                    <script>
-                    setTimeout(function() {
-                        window.parent.location.reload();
-                    }, 1500);
-                    </script>
-                    """,
-                    height=0
-                )
-                st.stop() # Stops Python here so it doesn't interrupt the Javascript
+                components.html("""<script>setTimeout(function() { window.parent.location.reload(); }, 1500);</script>""", height=0)
+                st.stop()
             else:
                 st.error("Please enter a username!")
 
 # --- PHASE 2: APP INTERFACE ---
 if st.session_state.logged_in:
-    st.sidebar.markdown(f"### 👤 {st.session_state.username}")
+    st.write(f"### 👋 Welcome, {st.session_state.username}")
     
-    # --- LOGOUT BUTTON FIX ---
-    if st.sidebar.button("🚪 Log Out"):
-        cookie_manager.delete("saved_username") # Destroy the cookie
-        st.session_state.logged_in = False      # Reset session memory
-        st.session_state.username = ""
-        
-        st.sidebar.success("Logging out...")
-        # CRITICAL FIX: Javascript reload to ensure cookie is deleted cleanly
-        components.html(
-            """
-            <script>
-            setTimeout(function() {
-                window.parent.location.reload();
-            }, 1500);
-            </script>
-            """,
-            height=0
-        )
-        st.stop()
-        
     tab1, tab2, tab3 = st.tabs(["🎛️ Balancer", "📜 History", "ℹ️ Help & Premium"])
 
     with tab1:
@@ -126,7 +85,6 @@ if st.session_state.logged_in:
         user_input = st.text_input("Enter Equation (Reactants -> Products):", value="KMnO4 + HCl -> KCl + MnCl2 + H2O + Cl2")
 
         if st.button("Balance Equation"):
-            # Premium Check
             if not st.session_state.is_premium and st.session_state.daily_balances >= 5:
                 st.error("🛑 Daily Limit Reached! Upgrade in the 'Help & Premium' tab.")
             else:
@@ -149,6 +107,17 @@ if st.session_state.logged_in:
             st.code(item)
 
     with tab3:
+        st.markdown("### ℹ️ Account & Premium")
+        
+        # --- LOGOUT BUTTON MOVED HERE ---
+        if st.button("🚪 Log Out"):
+            cookie_manager.delete("saved_username")
+            st.session_state.logged_in = False
+            st.session_state.username = ""
+            components.html("""<script>setTimeout(function() { window.parent.location.reload(); }, 1000);</script>""", height=0)
+            st.stop()
+            
+        st.markdown("---")
         st.markdown("### 📖 How to Use")
         st.write("1. **Enter Equation:** Use '+' for chemicals and '->' to separate reactants/products.")
         st.write("2. **Example:** `H2 + O2 -> H2O`")
@@ -156,19 +125,16 @@ if st.session_state.logged_in:
         
         st.markdown("---")
         st.markdown("### 👑 Unlock Premium (Unlimited)")
-        st.write("Message me on WhatsApp to buy a redeem code.")
         st.link_button("💬 Contact Me on WhatsApp", "https://wa.me/919123651311?text=Hi!%20I%20want%20to%20buy%20a%20premium%20balancer%20code.")
         
         code = st.text_input("Enter 8-Digit Redeem Code:")
         
-        # --- NEW DATABASE REDEMPTION LOGIC ---
         if st.button("Redeem Code"):
             if code.strip() == "":
                 st.error("Please enter a code first!")
             else:
                 with st.spinner("Checking database..."):
                     try:
-                        # Connect to Google Cloud
                         if os.path.exists('secrets.json'):
                             gc = gspread.service_account(filename='secrets.json')
                         else:
@@ -177,32 +143,18 @@ if st.session_state.logged_in:
                             
                         sh = gc.open("App Gift cards")
                         worksheet = sh.sheet1
+                        cell = worksheet.find(code.strip())
                         
-                        search_code = code.strip()
-                        cell = worksheet.find(search_code)
-                        
-                        if cell:
-                            # Check if it is used or unused
-                            status = worksheet.cell(cell.row, 2).value
-                            
-                            if status.lower() == "unused":
-                                # Mark as used in Column B
-                                worksheet.update_cell(cell.row, 2, 'used')
-                                # Save the actual username in Column C
-                                worksheet.update_cell(cell.row, 3, st.session_state.username)
-                                
-                                st.session_state.is_premium = True
-                                st.success("🎉 Premium Activated! Enjoy unlimited balancing.")
-                                time.sleep(2) 
-                                st.rerun() 
-                            else:
-                                st.error("❌ This code has already been used!")
+                        if cell and worksheet.cell(cell.row, 2).value.lower() == "unused":
+                            worksheet.update_cell(cell.row, 2, 'used')
+                            worksheet.update_cell(cell.row, 3, st.session_state.username)
+                            st.session_state.is_premium = True
+                            st.success("🎉 Premium Activated!")
+                            time.sleep(2); st.rerun() 
                         else:
-                            st.error("❌ Invalid Code. Please check for typos.")
-                    
+                            st.error("❌ Invalid or already used code.")
                     except Exception as e:
-                        st.error("Database error. Make sure your secrets.json is in the folder!")
-                        print(e)
+                        st.error("Database error.")
 
 # --- FOOTER ---
 st.markdown("---")
