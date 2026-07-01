@@ -12,10 +12,11 @@ from chempy import balance_stoichiometry
 st.set_page_config(page_title="🧪 Chemical Equation Balancer", page_icon="🧪", layout="centered", initial_sidebar_state="expanded")
 
 # --- Hide Branding (Deploy Button, Footer, Fork, Badge) ---
-# Cleaned up to ensure it NEVER touches the sidebar container
+# TARGETED FIX: We are no longer hiding the whole toolbar. We are ONLY hiding the specific ugly buttons.
 hide_st_style = """
             <style>
-            [data-testid="stToolbar"] {display: none !important;}
+            .stDeployButton {display: none !important;}
+            #MainMenu {visibility: hidden;}
             [data-testid="stViewerBadge"] {display: none !important;}
             footer {visibility: hidden;}
             </style>
