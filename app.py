@@ -8,23 +8,25 @@ import gspread
 from chempy import balance_stoichiometry
 
 # --- Page Configuration ---
-st.set_page_config(page_title="🧪 Chemical Equation Balancer", page_icon="🧪", layout="centered", initial_sidebar_state="expanded")
+# FIX: Switched back to 'auto' to prevent the closing glitch on web browsers
+st.set_page_config(page_title="🧪 Chemical Equation Balancer", page_icon="🧪", layout="centered", initial_sidebar_state="auto")
 
-# --- THE BULLETPROOF CSS FIX ---
+# --- THE SAFEST CSS FIX ---
 hide_st_style = """
             <style>
-            /* Hide the 'Deploy' Button (Covers both older and newer Streamlit versions) */
-            .stAppDeployButton {display:none;}
-            .stDeployButton {display:none;}
-            
-            /* Hide the Main Menu (Three dots) */
-            #MainMenu {visibility: hidden;}
-            
-            /* Hide the Footer */
-            footer {visibility: hidden;}
+            /* Safely hide the 'Deploy' Button and Main Menu without breaking the header */
+            .stAppDeployButton {display:none !important;}
+            .stDeployButton {display:none !important;}
+            #MainMenu {display: none !important;}
+            [data-testid="stViewerBadge"] {display: none !important;}
+            footer {visibility: hidden !important;}
             </style>
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
+
+# --- THE ULTIMATE ARROW FIX ---
+# This invisible container forces Streamlit to NEVER delete the sidebar arrow!
+st.sidebar.container()
 
 # --- 1. Initialize Cookie Manager ---
 cookie_manager = stx.CookieManager(key="cookie_manager")
@@ -51,7 +53,7 @@ if saved_user is not None and saved_user != "":
 
 st.title("🧪 Chemical Equation Balancer")
 
-# --- FORCE THE SIDEBAR ARROW TO ALWAYS STAY ---
+# --- FORCE THE SIDEBAR MENU ---
 st.sidebar.markdown("### 🧭 App Menu")
 if not st.session_state.logged_in:
     st.sidebar.info("Please log in to use the balancer.")
@@ -77,7 +79,6 @@ if not st.session_state.logged_in:
                 st.success("🚀 Login successful! Redirecting...")
                 
                 # CRITICAL FIX: Use Javascript to refresh the browser after 1.5 seconds.
-                # This guarantees the browser has time to finish saving the cookie file!
                 components.html(
                     """
                     <script>
