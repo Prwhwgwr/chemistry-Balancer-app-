@@ -8,17 +8,16 @@ import gspread
 from chempy import balance_stoichiometry
 
 # --- Page Configuration ---
-st.set_page_config(page_title="🧪 Chemical Equation Balancer", page_icon="🧪", layout="centered")
+# ADDED: initial_sidebar_state="expanded" so it automatically pops open when you log in!
+st.set_page_config(page_title="🧪 Chemical Equation Balancer", page_icon="🧪", layout="centered", initial_sidebar_state="expanded")
 
 # --- Hide Branding (Deploy Button, Footer, Fork, Badge) ---
-# NOTE: Removed 'header {visibility: hidden;}' so the sidebar arrow comes back!
+# Cleaned up to ensure it NEVER touches the sidebar container
 hide_st_style = """
             <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            .stDeployButton {display:none;}
-            [data-testid="stToolbar"] {visibility: hidden !important;}
+            [data-testid="stToolbar"] {display: none !important;}
             [data-testid="stViewerBadge"] {display: none !important;}
+            footer {visibility: hidden;}
             </style>
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
@@ -47,6 +46,11 @@ if saved_user is not None and saved_user != "":
     st.session_state.username = saved_user
 
 st.title("🧪 Chemical Equation Balancer")
+
+# --- FORCE THE SIDEBAR ARROW TO ALWAYS STAY ---
+st.sidebar.markdown("### 🧭 App Menu")
+if not st.session_state.logged_in:
+    st.sidebar.info("Please log in to use the balancer.")
 
 # --- PHASE 1: LOGIN PORTAL ---
 if not st.session_state.logged_in:
