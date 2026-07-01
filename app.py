@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import extra_streamlit_components as stx
 import datetime
 import time
@@ -61,8 +62,10 @@ if not st.session_state.logged_in:
                     expire_date = datetime.datetime.now() + datetime.timedelta(days=30)
                     cookie_manager.set("saved_username", user_input_name.strip(), expires_at=expire_date)
                 st.success("🚀 Login successful!")
-                time.sleep(1)
-                st.rerun() # Pure Python reload
+                components.html(
+                    "<script>setTimeout(function() { window.parent.location.reload(); }, 500);</script>", 
+                    height=0
+                )
             else:
                 st.error("Please enter a username!")
 
@@ -149,12 +152,22 @@ if st.session_state.logged_in:
     st.write(f"**Status:** {'Premium 👑' if st.session_state.is_premium else 'Free Tier'}")
     
     if st.button("🚪 Log Out", type="primary"):
-        cookie_manager.delete("saved_username")
         st.session_state.logged_in = False
         st.session_state.username = ""
         st.session_state.is_premium = False
-        time.sleep(0.5)
-        st.rerun() # Pure Python reload
+        
+        cookie_manager.delete("saved_username")
+        
+        # Foolproof browser wipe and hard refresh
+        logout_js = """
+        <script>
+            document.cookie = 'saved_username=; Max-Age=0; path=/';
+            setTimeout(function() {
+                window.parent.location.reload();
+            }, 500);
+        </script>
+        """
+        components.html(logout_js, height=0)
 
 # --- FOOTER ---
 st.markdown("---")
