@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import extra_streamlit_components as stx
 import datetime
 import time
@@ -61,15 +60,15 @@ if not st.session_state.logged_in:
                 if keep_signed_in:
                     expire_date = datetime.datetime.now() + datetime.timedelta(days=30)
                     cookie_manager.set("saved_username", user_input_name.strip(), expires_at=expire_date)
-                st.success("🚀 Login successful! Redirecting...")
-                components.html("""<script>setTimeout(function() { window.parent.location.reload(); }, 1500);</script>""", height=0)
-                st.stop()
+                st.success("🚀 Login successful!")
+                time.sleep(1)
+                st.rerun() # Pure Python reload
             else:
                 st.error("Please enter a username!")
 
 # --- PHASE 2: APP INTERFACE ---
 if st.session_state.logged_in:
-    # We now have 3 tabs
+    
     tab1, tab2, tab3 = st.tabs(["🎛️ Balancer", "📜 History", "ℹ️ Help"])
 
     with tab1:
@@ -140,24 +139,22 @@ if st.session_state.logged_in:
                             st.error("❌ Invalid Code. Please check for typos.")
                     except KeyError as ke:
                         st.error(f"⚠️ Missing Secret Key: {ke}")
-                        st.info("Did you paste your JSON file contents into Streamlit Cloud's App Settings -> Secrets?")
                     except Exception as e:
-                        st.error(f"⚠️ Specific Database Error: {str(e)}")
-                        st.info("Take a screenshot of this error and show it to me so we can fix it!")
+                        st.error(f"⚠️ Database Error: {str(e)}")
 
-    # --- USER PROFILE & LOGOUT (BOTTOM OF PAGE) ---
+    # --- BOTTOM PROFILE & LOGOUT SECTION ---
     st.markdown("---")
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.write(f"👤 **User:** {st.session_state.username} | **Status:** {'Premium 👑' if st.session_state.is_premium else 'Free'}")
-    with col2:
-        if st.button("🚪 Log Out", type="primary", use_container_width=True):
-            cookie_manager.delete("saved_username")
-            st.session_state.logged_in = False
-            st.session_state.username = ""
-            st.session_state.is_premium = False
-            time.sleep(0.5)
-            st.rerun()
+    st.markdown("### 👤 Account Profile")
+    st.write(f"**Username:** {st.session_state.username}")
+    st.write(f"**Status:** {'Premium 👑' if st.session_state.is_premium else 'Free Tier'}")
+    
+    if st.button("🚪 Log Out", type="primary"):
+        cookie_manager.delete("saved_username")
+        st.session_state.logged_in = False
+        st.session_state.username = ""
+        st.session_state.is_premium = False
+        time.sleep(0.5)
+        st.rerun() # Pure Python reload
 
 # --- FOOTER ---
 st.markdown("---")
