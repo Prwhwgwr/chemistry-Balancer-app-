@@ -152,11 +152,14 @@ if st.session_state.logged_in:
         
         st.markdown("---")
         if st.button("🚪 Log Out", type="primary"):
+            # 1. Delete the cookie
             cookie_manager.delete("saved_username")
+            # 2. Clear all session state variables related to login
             st.session_state.logged_in = False
             st.session_state.username = ""
-            components.html("""<script>setTimeout(function() { window.parent.location.reload(); }, 1000);</script>""", height=0)
-            st.stop()
+            st.session_state.is_premium = False
+            # 3. Force Streamlit to immediately rerun from the top
+            st.rerun()
 
 # --- FOOTER ---
 st.markdown("---")
