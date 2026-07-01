@@ -109,14 +109,6 @@ if st.session_state.logged_in:
     with tab3:
         st.markdown("### ℹ️ Account & Premium")
         
-        # --- LOGOUT BUTTON MOVED HERE ---
-        if st.button("🚪 Log Out"):
-            cookie_manager.delete("saved_username")
-            st.session_state.logged_in = False
-            st.session_state.username = ""
-            components.html("""<script>setTimeout(function() { window.parent.location.reload(); }, 1000);</script>""", height=0)
-            st.stop()
-            
         st.markdown("---")
         st.markdown("### 📖 How to Use")
         st.write("1. **Enter Equation:** Use '+' for chemicals and '->' to separate reactants/products.")
@@ -155,6 +147,15 @@ if st.session_state.logged_in:
                             st.error("❌ Invalid or already used code.")
                     except Exception as e:
                         st.error("Database error.")
+
+        st.markdown("---")
+        # --- LOGOUT BUTTON MOVED TO BOTTOM ---
+        if st.button("🚪 Log Out"):
+            cookie_manager.delete("saved_username")
+            st.session_state.logged_in = False
+            st.session_state.username = ""
+            components.html("""<script>setTimeout(function() { window.parent.location.reload(); }, 1000);</script>""", height=0)
+            st.stop()
 
 # --- FOOTER ---
 st.markdown("---")
