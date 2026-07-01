@@ -158,16 +158,9 @@ if st.session_state.logged_in:
         
         cookie_manager.delete("saved_username")
         
-        # Foolproof browser wipe and hard refresh
-        logout_js = """
-        <script>
-            document.cookie = 'saved_username=; Max-Age=0; path=/';
-            setTimeout(function() {
-                window.parent.location.reload();
-            }, 500);
-        </script>
-        """
-        components.html(logout_js, height=0)
+        # Native Streamlit rerun instead of blocked JavaScript
+        time.sleep(0.5)
+        st.rerun()
 
 # --- FOOTER ---
 st.markdown("---")
