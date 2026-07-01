@@ -8,14 +8,20 @@ import gspread
 from chempy import balance_stoichiometry
 
 # --- Page Configuration ---
-st.set_page_config(page_title="🧪 Chemical Equation Balancer", page_icon="🧪", layout="centered", initial_sidebar_state="auto")
+st.set_page_config(page_title="🧪 Chemical Equation Balancer", page_icon="🧪", layout="centered", initial_sidebar_state="expanded")
 
-# --- Hide Branding Safely (Without breaking mobile) ---
+# --- THE BULLETPROOF CSS FIX ---
 hide_st_style = """
             <style>
-            /* Hide ONLY the ugly top-right buttons and footer */
-            [data-testid="stToolbar"] {visibility: hidden !important;}
-            footer {visibility: hidden !important;}
+            /* Hide the 'Deploy' Button (Covers both older and newer Streamlit versions) */
+            .stAppDeployButton {display:none;}
+            .stDeployButton {display:none;}
+            
+            /* Hide the Main Menu (Three dots) */
+            #MainMenu {visibility: hidden;}
+            
+            /* Hide the Footer */
+            footer {visibility: hidden;}
             </style>
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
