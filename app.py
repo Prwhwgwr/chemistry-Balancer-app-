@@ -69,8 +69,8 @@ if not st.session_state.logged_in:
 
 # --- PHASE 2: APP INTERFACE ---
 if st.session_state.logged_in:
-    # We now have 4 tabs
-    tab1, tab2, tab3, tab4 = st.tabs(["🎛️ Balancer", "📜 History", "ℹ️ Help", "👤 Profile"])
+    # We now have 3 tabs
+    tab1, tab2, tab3 = st.tabs(["🎛️ Balancer", "📜 History", "ℹ️ Help"])
 
     with tab1:
         if not st.session_state.is_premium:
@@ -145,20 +145,18 @@ if st.session_state.logged_in:
                         st.error(f"⚠️ Specific Database Error: {str(e)}")
                         st.info("Take a screenshot of this error and show it to me so we can fix it!")
 
-    with tab4:
-        st.markdown("### 👤 User Profile")
-        st.write(f"**Username:** {st.session_state.username}")
-        st.write(f"**Status:** {'Premium' if st.session_state.is_premium else 'Free Member'}")
-        
-        st.markdown("---")
-        if st.button("🚪 Log Out", type="primary"):
-            # 1. Delete the cookie
+    # --- USER PROFILE & LOGOUT (BOTTOM OF PAGE) ---
+    st.markdown("---")
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.write(f"👤 **User:** {st.session_state.username} | **Status:** {'Premium 👑' if st.session_state.is_premium else 'Free'}")
+    with col2:
+        if st.button("🚪 Log Out", type="primary", use_container_width=True):
             cookie_manager.delete("saved_username")
-            # 2. Clear all session state variables related to login
             st.session_state.logged_in = False
             st.session_state.username = ""
             st.session_state.is_premium = False
-            # 3. Force Streamlit to immediately rerun from the top
+            time.sleep(0.5)
             st.rerun()
 
 # --- FOOTER ---
