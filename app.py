@@ -8,20 +8,14 @@ import gspread
 from chempy import balance_stoichiometry
 
 # --- Page Configuration ---
-st.set_page_config(page_title="🧪 Chemical Equation Balancer", page_icon="🧪", layout="centered", initial_sidebar_state="expanded")
+st.set_page_config(page_title="🧪 Chemical Equation Balancer", page_icon="🧪", layout="centered", initial_sidebar_state="auto")
 
-# --- Hide Branding & DESTROY Sidebar Arrow ---
+# --- Hide Branding Safely (Without breaking mobile) ---
 hide_st_style = """
             <style>
-            /* Hide the ugly top-right buttons */
-            .stDeployButton {display: none !important;}
-            #MainMenu {visibility: hidden;}
-            [data-testid="stViewerBadge"] {display: none !important;}
-            footer {visibility: hidden;}
-            
-            /* Destroy the Open/Close Sidebar Buttons completely */
-            [data-testid="collapsedControl"] {display: none !important;}
-            [data-testid="stSidebarCollapseButton"] {display: none !important;}
+            /* Hide ONLY the ugly top-right buttons and footer */
+            [data-testid="stToolbar"] {visibility: hidden !important;}
+            footer {visibility: hidden !important;}
             </style>
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
